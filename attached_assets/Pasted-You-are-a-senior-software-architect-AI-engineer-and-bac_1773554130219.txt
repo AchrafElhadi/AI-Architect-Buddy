@@ -1,0 +1,346 @@
+You are a senior software architect, AI engineer, and backend engineer with deep experience in Spring Boot, AI systems, and scalable SaaS architectures.
+
+Your task is to analyze, architect, and design a complete backend system, and also produce a clear implementation plan and autonomous implementation tasks that other AI agents can execute.
+
+PROJECT CONTEXT
+
+I am developing a platform that helps Facebook page owners automatically respond to users who ask questions in Facebook comments or Messenger.
+
+Many sellers promote products on Facebook using:
+
+posts
+
+ads
+
+boosted publications
+
+After posting a product, they receive many repetitive questions from users such as:
+
+price
+
+availability
+
+colors
+
+quantity
+
+delivery
+
+product details
+
+These questions appear either:
+
+in post comments
+
+in private Messenger conversations
+
+The page owner must answer each person manually, which is time-consuming and inefficient.
+
+GOAL
+
+Build a system that uses AI to automatically respond to these users, behaving like a human sales assistant and guiding them toward purchasing.
+
+TECHNOLOGY STACK
+
+Backend: Spring Boot
+
+AI Integration: Spring AI (very important requirement)
+
+Spring AI must be used so the system can easily switch between AI providers such as:
+
+OpenAI GPT models
+
+Google Gemini models
+
+other future providers
+
+The system must be designed so that changing the AI provider requires minimal code changes.
+
+PRODUCT FUNCTIONALITY
+Product Management Interface
+
+The page owner can add a product with information such as:
+
+product name
+
+Facebook post URL or post ID
+
+price
+
+available colors
+
+quantity or stock
+
+description
+
+other relevant attributes
+
+This information will serve as knowledge used by the AI to answer users.
+
+Monitoring Facebook Interactions
+
+The system must monitor:
+
+Messenger conversations
+
+comments on product posts
+
+When a user asks a question, the AI generates a response using:
+
+product information
+
+conversation history
+
+context
+
+AI Conversation Behavior
+
+The AI must:
+
+behave like a human sales assistant
+
+answer clearly and naturally
+
+remember conversation history
+
+ask follow-up questions to guide the user toward purchasing
+
+respond in the same language used by the customer
+
+escalate to manual mode if it cannot answer confidently
+
+Conversation Management Dashboard
+
+The platform must include a dashboard that displays conversations (leads).
+
+Each conversation should display:
+
+user name
+
+conversation history
+
+related product
+
+conversation status
+
+AI/MANUAL toggle switch
+
+Modes:
+
+AI MODE
+
+AI answers automatically.
+
+MANUAL MODE
+
+The page owner handles the conversation.
+
+The system must automatically switch to manual mode when the AI detects:
+
+price negotiation
+
+complex questions
+
+lack of information
+
+special requests
+
+Conversation Organization Using Tabs
+
+The conversation interface must be divided into tabs.
+
+Confirmed Conversations Tab
+
+This tab contains conversations where:
+
+the AI guided the user through the sales process
+
+the user confirmed interest in purchasing
+
+the user provided purchase information such as:
+
+phone number
+
+delivery address
+
+order details
+
+Important rules:
+
+these conversations represent confirmed leads
+
+they must always display the AI/MANUAL switch
+
+the page owner can still take control if needed
+
+Conversations In Progress Tab
+
+This tab contains conversations where:
+
+the user is actively discussing the product
+
+the AI is guiding the conversation
+
+Examples include discussions about:
+
+colors
+
+delivery
+
+product details
+
+quantities
+
+price clarification
+
+Important rule:
+
+Do not include conversations with only one or two very short messages, such as:
+
+“price?”
+
+“available?”
+
+These should not yet be considered active conversations.
+
+Manual Intervention Tab
+
+This tab contains conversations requiring page owner interaction, such as:
+
+negotiation
+
+special requests
+
+AI low confidence
+
+AI escalation
+
+These conversations must automatically be placed in MANUAL MODE.
+
+Conversation Model (VERY IMPORTANT)
+
+Conversations must be linked to products.
+
+A single user may have multiple conversations, for example:
+
+User asks about Product A → Conversation A
+User asks about Product B → Conversation B
+
+Therefore:
+
+conversations must be linked to a specific product
+
+a user may have multiple conversations
+
+each conversation must maintain its own message history
+
+This structure is essential for:
+
+AI context
+
+lead tracking
+
+analytics
+
+Conversation Detail View
+
+When the page owner opens a conversation, the interface should display:
+
+latest messages
+
+full conversation history (if accessible through Facebook API)
+
+If Facebook policies allow it, the owner may reply directly from the dashboard.
+
+Otherwise, the system must provide a button redirecting to Messenger.
+
+Comment Handling
+
+The system must also handle post comments.
+
+If a user asks a question in a comment:
+
+the AI replies to the comment
+
+optionally sends a private message to the user in Messenger
+
+AI Behavior Example
+
+Example conversation flow:
+
+User
+How much is this?
+
+AI
+The price is 200 MAD.
+We currently have red, black, and blue.
+Which color would you like?
+
+User
+red
+
+AI
+Great choice!
+How many pieces would you like?
+
+CURRENT PROJECT SCOPE
+
+Initially this system will only be used for my own Facebook page.
+
+There is no authentication system required for now.
+
+Once the platform is stable, it may evolve into a SaaS product.
+
+FUTURE VERSION (NOT NOW)
+
+Future versions may integrate with ecommerce platforms such as:
+
+Shopify
+
+WooCommerce
+
+This could allow the AI to:
+
+check product availability
+
+create orders
+
+update stock
+
+manage customers
+
+However this is version 2 and should not heavily influence the current architecture.
+
+YOUR TASKS
+
+You must:
+
+Analyze whether the system can be implemented using Facebook APIs
+
+Identify possible:
+
+limitations
+
+restrictions
+
+Facebook policy issues
+
+Propose a clean backend architecture
+
+Design the database schema
+
+Design the message processing flow from Facebook webhook to AI response
+
+Explain how conversation history should be stored and used for AI context
+
+Explain how Spring AI should be integrated to support multiple AI providers
+
+Suggest improvements for future SaaS scalability
+
+Identify performance and scalability risks and propose solutions
+
+IMPLEMENTATION PLAN AND AUTONOMOUS TASKS (VERY IMPORTANT)
+
+In addition to the architecture, you must also produce a clear implementation plan and a set of autonomous implementation tasks.
+
+These tasks will be executed by other AI agents in separate sessions, so they must be fully self-contained.

@@ -1,22 +1,29 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: FB Sales Assistant API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: products
+    description: Product management
+  - name: conversations
+    description: Conversation management
+  - name: messages
+    description: Message management
+  - name: webhook
+    description: Facebook webhook
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +31,318 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List all products
+      responses:
+        "200":
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+    post:
+      operationId: createProduct
+      tags: [products]
+      summary: Create a product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductBody"
+      responses:
+        "201":
+          description: Created product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: Get a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateProduct
+      tags: [products]
+      summary: Update a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductBody"
+      responses:
+        "200":
+          description: Updated product
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteProduct
+      tags: [products]
+      summary: Delete a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [conversations]
+      summary: List conversations with optional tab filter
+      parameters:
+        - name: tab
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [confirmed, in_progress, manual]
+        - name: productId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+
+  /conversations/{id}:
+    get:
+      operationId: getConversation
+      tags: [conversations]
+      summary: Get a conversation with its messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Conversation with messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateConversation
+      tags: [conversations]
+      summary: Update conversation mode or status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConversationBody"
+      responses:
+        "200":
+          description: Updated conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /conversations/{id}/messages:
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message in a conversation (manual mode)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageBody"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /conversations/{id}/ai-reply:
+    post:
+      operationId: triggerAiReply
+      tags: [messages]
+      summary: Trigger an AI reply in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: AI reply generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /webhook/facebook:
+    get:
+      operationId: verifyFacebookWebhook
+      tags: [webhook]
+      summary: Facebook webhook verification
+      parameters:
+        - name: hub.mode
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: hub.verify_token
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: hub.challenge
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Challenge response
+          content:
+            text/plain:
+              schema:
+                type: string
+        "403":
+          description: Forbidden
+    post:
+      operationId: receiveFacebookWebhook
+      tags: [webhook]
+      summary: Receive Facebook webhook events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Accepted
+
+  /simulate/message:
+    post:
+      operationId: simulateMessage
+      tags: [webhook]
+      summary: Simulate a user message (for testing without Facebook)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimulateMessageBody"
+      responses:
+        "201":
+          description: Simulated message processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulateMessageResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +353,254 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        facebookPostUrl:
+          type: ["string", "null"]
+        facebookPostId:
+          type: ["string", "null"]
+        price:
+          type: number
+        colors:
+          type: ["string", "null"]
+        stock:
+          type: ["integer", "null"]
+        description:
+          type: ["string", "null"]
+        attributes:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - price
+        - isActive
+        - createdAt
+        - updatedAt
+
+    CreateProductBody:
+      type: object
+      properties:
+        name:
+          type: string
+        facebookPostUrl:
+          type: ["string", "null"]
+        facebookPostId:
+          type: ["string", "null"]
+        price:
+          type: number
+        colors:
+          type: ["string", "null"]
+        stock:
+          type: ["integer", "null"]
+        description:
+          type: ["string", "null"]
+        attributes:
+          type: ["string", "null"]
+      required:
+        - name
+        - price
+
+    UpdateProductBody:
+      type: object
+      properties:
+        name:
+          type: string
+        facebookPostUrl:
+          type: ["string", "null"]
+        facebookPostId:
+          type: ["string", "null"]
+        price:
+          type: number
+        colors:
+          type: ["string", "null"]
+        stock:
+          type: ["integer", "null"]
+        description:
+          type: ["string", "null"]
+        attributes:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        productName:
+          type: string
+        fbUserId:
+          type: string
+        fbUserName:
+          type: ["string", "null"]
+        mode:
+          type: string
+          enum: [ai, manual]
+        status:
+          type: string
+          enum: [in_progress, confirmed, manual_intervention]
+        lastMessage:
+          type: ["string", "null"]
+        messageCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - productId
+        - productName
+        - fbUserId
+        - mode
+        - status
+        - messageCount
+        - createdAt
+        - updatedAt
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        role:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+        source:
+          type: string
+          enum: [facebook, manual, ai, simulated]
+        fbMessageId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - conversationId
+        - role
+        - content
+        - source
+        - createdAt
+
+    ConversationDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        productName:
+          type: string
+        fbUserId:
+          type: string
+        fbUserName:
+          type: ["string", "null"]
+        mode:
+          type: string
+          enum: [ai, manual]
+        status:
+          type: string
+          enum: [in_progress, confirmed, manual_intervention]
+        messageCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        product:
+          $ref: "#/components/schemas/Product"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+      required:
+        - id
+        - productId
+        - productName
+        - fbUserId
+        - mode
+        - status
+        - messageCount
+        - createdAt
+        - updatedAt
+        - product
+        - messages
+
+    UpdateConversationBody:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [ai, manual]
+        status:
+          type: string
+          enum: [in_progress, confirmed, manual_intervention]
+
+    SendMessageBody:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
+
+    SimulateMessageBody:
+      type: object
+      properties:
+        productId:
+          type: integer
+        fbUserId:
+          type: string
+        fbUserName:
+          type: string
+        message:
+          type: string
+      required:
+        - productId
+        - fbUserId
+        - message
+
+    SimulateMessageResponse:
+      type: object
+      properties:
+        conversation:
+          $ref: "#/components/schemas/Conversation"
+        userMessage:
+          $ref: "#/components/schemas/Message"
+        aiReply:
+          $ref: "#/components/schemas/Message"
+      required:
+        - conversation
+        - userMessage
+        - aiReply
