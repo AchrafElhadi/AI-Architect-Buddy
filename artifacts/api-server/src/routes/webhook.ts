@@ -3,10 +3,13 @@ import { eq, and } from "drizzle-orm";
 import { db, conversationsTable, messagesTable, productsTable } from "@workspace/db";
 import { SimulateMessageBody } from "@workspace/api-zod";
 import { generateAiReply } from "../lib/ai";
+import { replyToComment, sendMessengerMessage, buildCommentAckText } from "../lib/facebook";
 
 const router: IRouter = Router();
 
 const WEBHOOK_VERIFY_TOKEN = process.env.FB_WEBHOOK_VERIFY_TOKEN ?? "fb_verify_token_123";
+
+// ─── Facebook Webhook Verification ───────────────────────────────────────────
 
 router.get("/webhook/facebook", (req, res): void => {
   const mode = req.query["hub.mode"];
@@ -21,11 +24,14 @@ router.get("/webhook/facebook", (req, res): void => {
   }
 });
 
+// ─── Facebook Webhook Events ──────────────────────────────────────────────────
+
 router.post("/webhook/facebook", async (req, res): Promise<void> => {
   const body = req.body;
 
   if (body.object === "page") {
     for (const entry of body.entry ?? []) {
+      // ── Messenger messages ──────────────────────────────────────────────────
       for (const messagingEvent of entry.messaging ?? []) {
         if (messagingEvent.message && !messagingEvent.message.is_echo) {
           const fbUserId = messagingEvent.sender?.id as string;
@@ -33,28 +39,46 @@ router.post("/webhook/facebook", async (req, res): Promise<void> => {
           const fbMessageId = messagingEvent.message?.mid as string;
 
           if (fbUserId && messageText) {
-            await handleIncomingMessage({
+            const result = await handleIncomingMessage({
               fbUserId,
               messageText,
               fbMessageId,
               source: "facebook",
             });
+
+            // Send AI reply back via Messenger
+            if (result?.aiReply?.content) {
+              await sendMessengerMessage(fbUserId, result.aiReply.content);
+            }
           }
         }
       }
 
+      // ── Page feed events (comments on posts) ────────────────────────────────
       for (const change of entry.changes ?? []) {
         if (change.field === "feed" && change.value?.item === "comment") {
           const fbUserId = change.value?.from?.id as string;
+          const fbUserName = change.value?.from?.name as string | undefined;
           const messageText = change.value?.message as string;
+          const commentId = change.value?.comment_id as string;
 
           if (fbUserId && messageText) {
-            await handleIncomingMessage({
+            const result = await handleIncomingMessage({
               fbUserId,
+              fbUserName,
               messageText,
-              fbMessageId: change.value?.comment_id,
+              fbMessageId: commentId,
               source: "facebook",
             });
+
+            if (result?.aiReply?.content) {
+              // 1️⃣ Reply publicly on the comment: "I answered you in private"
+              const ackText = buildCommentAckText(result.aiReply.content);
+              await replyToComment(commentId, ackText);
+
+              // 2️⃣ Send the full AI reply as a private Messenger message
+              await sendMessengerMessage(fbUserId, result.aiReply.content);
+            }
           }
         }
       }
@@ -63,6 +87,8 @@ router.post("/webhook/facebook", async (req, res): Promise<void> => {
 
   res.status(200).json({ status: "ok" });
 });
+
+// ─── Core message handler (shared by webhook + simulate) ─────────────────────
 
 async function handleIncomingMessage({
   fbUserId,
@@ -119,6 +145,7 @@ async function handleIncomingMessage({
 
   await db.update(conversationsTable).set({ updatedAt: new Date() }).where(eq(conversationsTable.id, conv.id));
 
+  // If in manual mode, store message but don't generate AI reply
   if (conv.mode !== "ai") {
     return { conv, userMessage, aiReply: null };
   }
@@ -165,6 +192,8 @@ async function handleIncomingMessage({
 
   return { conv, userMessage, aiReply };
 }
+
+// ─── Simulate endpoint (for testing without real Facebook) ───────────────────
 
 router.post("/simulate/message", async (req, res): Promise<void> => {
   const parsed = SimulateMessageBody.safeParse(req.body);
