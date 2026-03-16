@@ -40,6 +40,14 @@ router.get("/webhook/facebook", (req, res): void => {
 
 router.post("/webhook/facebook", async (req, res): Promise<void> => {
   const body = req.body;
+  console.log(
+    "Facebook webhook post verification attempt",
+    WEBHOOK_VERIFY_TOKEN,
+  );
+
+  console.log("Facebook webhook event received body request");
+
+  console.dir(body, { depth: null });
 
   if (body.object === "page") {
     for (const entry of body.entry ?? []) {
@@ -49,7 +57,6 @@ router.post("/webhook/facebook", async (req, res): Promise<void> => {
           const fbUserId = messagingEvent.sender?.id as string;
           const messageText = messagingEvent.message?.text as string;
           const fbMessageId = messagingEvent.message?.mid as string;
-
           if (fbUserId && messageText) {
             const result = await handleIncomingMessage({
               fbUserId,
@@ -58,6 +65,7 @@ router.post("/webhook/facebook", async (req, res): Promise<void> => {
               source: "facebook",
             });
 
+            console.log("=== reply : " + result?.aiReply?.content);
             // Send AI reply back via Messenger
             if (result?.aiReply?.content) {
               await sendMessengerMessage(fbUserId, result.aiReply.content);
