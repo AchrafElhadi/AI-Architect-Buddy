@@ -81,6 +81,13 @@ router.post("/webhook/facebook", async (req, res): Promise<void> => {
           const fbUserName = change.value?.from?.name as string | undefined;
           const messageText = change.value?.message as string;
           const commentId = change.value?.comment_id as string;
+          const pageId = entry.id as string;
+
+          // Skip comments made by the Page itself to prevent infinite reply loops
+          if (fbUserId === pageId) {
+            console.log(`[Webhook] Skipping own page comment from ${fbUserId}`);
+            continue;
+          }
 
           if (fbUserId && messageText) {
             const result = await handleIncomingMessage({
