@@ -58,17 +58,20 @@ router.post("/webhook/facebook", async (req, res): Promise<void> => {
           const messageText = messagingEvent.message?.text as string;
           const fbMessageId = messagingEvent.message?.mid as string;
           if (fbUserId && messageText) {
-            const result = await handleIncomingMessage({
-              fbUserId,
-              messageText,
-              fbMessageId,
-              source: "facebook",
-            });
-
-            console.log("=== reply : " + result?.aiReply?.content);
-            // Send AI reply back via Messenger
-            if (result?.aiReply?.content) {
-              await sendMessengerMessage(fbUserId, result.aiReply.content);
+            try {
+              const result = await handleIncomingMessage({
+                fbUserId,
+                messageText,
+                fbMessageId,
+                source: "facebook",
+              });
+              if (result?.aiReply?.content) {
+                await sendMessengerMessage(fbUserId, result.aiReply.content);
+              } else {
+                console.log(`[Webhook] Messenger: no AI reply for ${fbUserId} (mode=${result?.conv?.mode})`);
+              }
+            } catch (err) {
+              console.error(`[Webhook] ERROR handling Messenger message from ${fbUserId}:`, err);
             }
           }
         }
@@ -90,21 +93,28 @@ router.post("/webhook/facebook", async (req, res): Promise<void> => {
           }
 
           if (fbUserId && messageText) {
-            const result = await handleIncomingMessage({
-              fbUserId,
-              fbUserName,
-              messageText,
-              fbMessageId: commentId,
-              source: "facebook",
-            });
+            console.log(`[Webhook] Comment from ${fbUserName ?? fbUserId}: "${messageText}"`);
+            try {
+              const result = await handleIncomingMessage({
+                fbUserId,
+                fbUserName,
+                messageText,
+                fbMessageId: commentId,
+                source: "facebook",
+              });
 
-            if (result?.aiReply?.content) {
-              // 1️⃣ Reply publicly on the comment: "I answered you in private"
-              const ackText = buildCommentAckText(result.aiReply.content);
-              await replyToComment(commentId, ackText);
+              if (result?.aiReply?.content) {
+                // 1️⃣ Reply publicly on the comment: "I answered you in private"
+                const ackText = buildCommentAckText(result.aiReply.content, messageText);
+                await replyToComment(commentId, ackText);
 
-              // 2️⃣ Send the full AI reply as a private Messenger message
-              await sendMessengerMessage(fbUserId, result.aiReply.content);
+                // 2️⃣ Send the full AI reply as a private Messenger message
+                await sendMessengerMessage(fbUserId, result.aiReply.content);
+              } else {
+                console.log(`[Webhook] Comment: no AI reply for ${fbUserId} (mode=${result?.conv?.mode})`);
+              }
+            } catch (err) {
+              console.error(`[Webhook] ERROR handling comment from ${fbUserId} "${messageText}":`, err);
             }
           }
         }
