@@ -1,13 +1,23 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, conversationsTable, messagesTable, productsTable } from "@workspace/db";
+import {
+  db,
+  conversationsTable,
+  messagesTable,
+  productsTable,
+} from "@workspace/db";
 import { SimulateMessageBody } from "@workspace/api-zod";
 import { generateAiReply } from "../lib/ai";
-import { replyToComment, sendMessengerMessage, buildCommentAckText } from "../lib/facebook";
+import {
+  replyToComment,
+  sendMessengerMessage,
+  buildCommentAckText,
+} from "../lib/facebook";
 
 const router: IRouter = Router();
 
-const WEBHOOK_VERIFY_TOKEN = process.env.FB_WEBHOOK_VERIFY_TOKEN ?? "fb_verify_token_123";
+const WEBHOOK_VERIFY_TOKEN =
+  process.env.FB_WEBHOOK_VERIFY_TOKEN ?? "fb_verify_token_123";
 
 // ─── Facebook Webhook Verification ───────────────────────────────────────────
 
@@ -15,6 +25,8 @@ router.get("/webhook/facebook", (req, res): void => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
+
+  console.log("Facebook webhook verification attempt", WEBHOOK_VERIFY_TOKEN);
 
   if (mode === "subscribe" && token === WEBHOOK_VERIFY_TOKEN) {
     console.log("Facebook webhook verified");
@@ -108,7 +120,11 @@ async function handleIncomingMessage({
   let targetProductId = productId;
 
   if (!targetProductId) {
-    const [firstProduct] = await db.select().from(productsTable).where(eq(productsTable.isActive, true)).limit(1);
+    const [firstProduct] = await db
+      .select()
+      .from(productsTable)
+      .where(eq(productsTable.isActive, true))
+      .limit(1);
     if (!firstProduct) return null;
     targetProductId = firstProduct.id;
   }
@@ -125,32 +141,44 @@ async function handleIncomingMessage({
     .limit(1);
 
   if (!conv) {
-    const [newConv] = await db.insert(conversationsTable).values({
-      productId: targetProductId,
-      fbUserId,
-      fbUserName: fbUserName ?? null,
-      mode: "ai",
-      status: "in_progress",
-    }).returning();
+    const [newConv] = await db
+      .insert(conversationsTable)
+      .values({
+        productId: targetProductId,
+        fbUserId,
+        fbUserName: fbUserName ?? null,
+        mode: "ai",
+        status: "in_progress",
+      })
+      .returning();
     conv = newConv;
   }
 
-  const [userMessage] = await db.insert(messagesTable).values({
-    conversationId: conv.id,
-    role: "user",
-    content: messageText,
-    source,
-    fbMessageId: fbMessageId ?? null,
-  }).returning();
+  const [userMessage] = await db
+    .insert(messagesTable)
+    .values({
+      conversationId: conv.id,
+      role: "user",
+      content: messageText,
+      source,
+      fbMessageId: fbMessageId ?? null,
+    })
+    .returning();
 
-  await db.update(conversationsTable).set({ updatedAt: new Date() }).where(eq(conversationsTable.id, conv.id));
+  await db
+    .update(conversationsTable)
+    .set({ updatedAt: new Date() })
+    .where(eq(conversationsTable.id, conv.id));
 
   // If in manual mode, store message but don't generate AI reply
   if (conv.mode !== "ai") {
     return { conv, userMessage, aiReply: null };
   }
 
-  const [product] = await db.select().from(productsTable).where(eq(productsTable.id, targetProductId));
+  const [product] = await db
+    .select()
+    .from(productsTable)
+    .where(eq(productsTable.id, targetProductId));
   if (!product) return { conv, userMessage, aiReply: null };
 
   const history = await db
@@ -175,19 +203,30 @@ async function handleIncomingMessage({
     chatHistory,
   );
 
-  const [aiReply] = await db.insert(messagesTable).values({
-    conversationId: conv.id,
-    role: "assistant",
-    content,
-    source: "ai",
-  }).returning();
+  const [aiReply] = await db
+    .insert(messagesTable)
+    .values({
+      conversationId: conv.id,
+      role: "assistant",
+      content,
+      source: "ai",
+    })
+    .returning();
 
   if (shouldEscalate) {
-    await db.update(conversationsTable)
-      .set({ mode: "manual", status: "manual_intervention", updatedAt: new Date() })
+    await db
+      .update(conversationsTable)
+      .set({
+        mode: "manual",
+        status: "manual_intervention",
+        updatedAt: new Date(),
+      })
       .where(eq(conversationsTable.id, conv.id));
   } else {
-    await db.update(conversationsTable).set({ updatedAt: new Date() }).where(eq(conversationsTable.id, conv.id));
+    await db
+      .update(conversationsTable)
+      .set({ updatedAt: new Date() })
+      .where(eq(conversationsTable.id, conv.id));
   }
 
   return { conv, userMessage, aiReply };
@@ -215,7 +254,10 @@ router.post("/simulate/message", async (req, res): Promise<void> => {
     return;
   }
 
-  const [product] = await db.select().from(productsTable).where(eq(productsTable.id, result.conv.productId));
+  const [product] = await db
+    .select()
+    .from(productsTable)
+    .where(eq(productsTable.id, result.conv.productId));
 
   const convWithMeta = {
     ...result.conv,

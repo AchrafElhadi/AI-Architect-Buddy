@@ -12,7 +12,10 @@ import {
 const router: IRouter = Router();
 
 router.get("/products", async (_req, res): Promise<void> => {
-  const products = await db.select().from(productsTable).orderBy(productsTable.createdAt);
+  const products = await db
+    .select()
+    .from(productsTable)
+    .orderBy(productsTable.createdAt);
   res.json(products);
 });
 
@@ -23,10 +26,13 @@ router.post("/products", async (req, res): Promise<void> => {
     return;
   }
 
-  const [product] = await db.insert(productsTable).values({
-    ...parsed.data,
-    price: String(parsed.data.price),
-  }).returning();
+  const [product] = await db
+    .insert(productsTable)
+    .values({
+      ...parsed.data,
+      price: String(parsed.data.price),
+    })
+    .returning();
 
   res.status(201).json(product);
 });
@@ -38,7 +44,10 @@ router.get("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const [product] = await db.select().from(productsTable).where(eq(productsTable.id, params.data.id));
+  const [product] = await db
+    .select()
+    .from(productsTable)
+    .where(eq(productsTable.id, params.data.id));
   if (!product) {
     res.status(404).json({ error: "Product not found" });
     return;
@@ -86,7 +95,10 @@ router.delete("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  const [product] = await db.delete(productsTable).where(eq(productsTable.id, params.data.id)).returning();
+  const [product] = await db
+    .delete(productsTable)
+    .where(eq(productsTable.id, params.data.id))
+    .returning();
   if (!product) {
     res.status(404).json({ error: "Product not found" });
     return;
