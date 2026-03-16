@@ -65,27 +65,3 @@ export async function sendMessengerMessage(recipientId: string, text: string): P
   }
 }
 
-/**
- * Build the public comment reply text acknowledging the private message.
- * Uses the user's original message to detect language (more reliable than checking AI output).
- */
-export function buildCommentAckText(aiReplyContent: string, userMessage: string = ""): string {
-  const userText = userMessage.toLowerCase();
-  const aiText = aiReplyContent.toLowerCase();
-
-  const hasArabicScript = /[\u0600-\u06FF]/.test(userMessage) || /[\u0600-\u06FF]/.test(aiReplyContent);
-  const hasDarija = /\b(salam|ch7al|bghit|wach|kayn|dyal|fin|chno|kifash|bslama|labas|taman|chhal)\b/i.test(userText);
-  const hasFrench = /\b(bonjour|salut|prix|couleur|disponible|merci|svp|combien|qu.elle|comment)\b/i.test(userText)
-    || /\b(bonjour|merci|oui|non|disponible|couleur|livraison)\b/.test(aiText);
-
-  if (hasDarija) {
-    return "Salam! Jwbtk f message privé f Messenger, chuf les messages dyalek 📩";
-  }
-  if (hasArabicScript) {
-    return "مرحباً! لقد أجبتك في رسالة خاصة على Messenger. تحقق من صندوق الوارد الخاص بك 📩";
-  }
-  if (hasFrench) {
-    return "Bonjour ! Je vous ai répondu en message privé sur Messenger. Consultez votre boîte de réception 📩";
-  }
-  return "Hi! I've sent you a private message on Messenger with all the details 📩";
-}

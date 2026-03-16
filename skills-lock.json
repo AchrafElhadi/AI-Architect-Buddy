@@ -5,6 +5,11 @@
       "source": "intellectronica/agent-skills",
       "sourceType": "github",
       "computedHash": "fccbea654f8e35824a8bdce3e059e206efeb6c1fab9f6c096c3867e761081983"
+    },
+    "playwright-skill": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "915f9c5cf1387e3860a67ad74c0ac287f994c2f95fbed4c1d8eca536e4e5df81"
     }
   }
 }

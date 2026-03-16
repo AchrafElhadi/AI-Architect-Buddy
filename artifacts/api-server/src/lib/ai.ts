@@ -69,6 +69,40 @@ function buildSystemPrompt(product: ProductContext): string {
   return parts.join("\n");
 }
 
+/**
+ * Detects the language of the user's message and returns the comment acknowledgement
+ * ("I've sent you a private message") translated into that exact language/dialect.
+ * Falls back to English if the AI call fails.
+ */
+export async function generateCommentAck(userMessage: string): Promise<string> {
+  const FALLBACK = "Hi! I've sent you a private message on Messenger with all the details 📩";
+  try {
+    const openai = getClient();
+    const response = await openai.chat.completions.create({
+      model: "gpt-5-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a translator. The user will send you a short message in any language or dialect " +
+            "(including Moroccan Darija written in Latin letters + numbers, Arabic, French, English, etc.). " +
+            "Detect the language/dialect of that message and translate the following sentence into the SAME language and style:\n\n" +
+            '"Hi! I\'ve sent you a private message on Messenger with all the details 📩"\n\n' +
+            "Return ONLY the translated sentence. No explanations, no quotes, no extra text.",
+        },
+        { role: "user", content: userMessage },
+      ],
+      max_completion_tokens: 1000,
+    });
+
+    const text = response.choices[0]?.message?.content?.trim();
+    return text && text.length > 0 ? text : FALLBACK;
+  } catch (err) {
+    console.error("[AI] generateCommentAck failed, using fallback:", err);
+    return FALLBACK;
+  }
+}
+
 export async function generateAiReply(
   product: ProductContext,
   conversationHistory: ChatMessage[],

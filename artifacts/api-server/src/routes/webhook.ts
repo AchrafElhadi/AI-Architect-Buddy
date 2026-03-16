@@ -7,12 +7,8 @@ import {
   productsTable,
 } from "@workspace/db";
 import { SimulateMessageBody } from "@workspace/api-zod";
-import { generateAiReply } from "../lib/ai";
-import {
-  replyToComment,
-  sendMessengerMessage,
-  buildCommentAckText,
-} from "../lib/facebook";
+import { generateAiReply, generateCommentAck } from "../lib/ai";
+import { replyToComment, sendMessengerMessage } from "../lib/facebook";
 
 const router: IRouter = Router();
 
@@ -104,8 +100,8 @@ router.post("/webhook/facebook", async (req, res): Promise<void> => {
               });
 
               if (result?.aiReply?.content) {
-                // 1️⃣ Reply publicly on the comment: "I answered you in private"
-                const ackText = buildCommentAckText(result.aiReply.content, messageText);
+                // 1️⃣ Reply publicly on the comment — AI detects user's language and translates the ack
+                const ackText = await generateCommentAck(messageText);
                 await replyToComment(commentId, ackText);
 
                 // 2️⃣ Send the full AI reply as a private Messenger message
