@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import {
   db,
   conversationsTable,
@@ -67,6 +67,32 @@ router.post("/webhook/facebook", async (req, res): Promise<void> => {
               : (await db.select().from(productsTable).where(eq(productsTable.isActive, true)).limit(1))[0];
 
             if (product) {
+              // Create or update the conversation so follow-up messages use the right product
+              const [existingConv] = await db
+                .select()
+                .from(conversationsTable)
+                .where(and(
+                  eq(conversationsTable.fbUserId, fbUserId),
+                  eq(conversationsTable.productId, product.id),
+                ))
+                .limit(1);
+
+              if (!existingConv) {
+                await db.insert(conversationsTable).values({
+                  productId: product.id,
+                  fbUserId,
+                  fbUserName: null,
+                  mode: "ai",
+                  status: "in_progress",
+                });
+                console.log(`[Webhook] Created conversation for ${fbUserId} → product_${product.id}`);
+              } else {
+                await db
+                  .update(conversationsTable)
+                  .set({ updatedAt: new Date() })
+                  .where(eq(conversationsTable.id, existingConv.id));
+              }
+
               const price = Number(product.price).toFixed(2);
               const welcome =
                 `Hi! 👋 Thanks for reaching out about "${product.name}".\n` +
@@ -174,13 +200,27 @@ async function handleIncomingMessage({
   let targetProductId = productId;
 
   if (!targetProductId) {
-    const [firstProduct] = await db
+    // First: look for any existing conversation for this user (most recently active)
+    const [existingConv] = await db
       .select()
-      .from(productsTable)
-      .where(eq(productsTable.isActive, true))
+      .from(conversationsTable)
+      .where(eq(conversationsTable.fbUserId, fbUserId))
+      .orderBy(desc(conversationsTable.updatedAt))
       .limit(1);
-    if (!firstProduct) return null;
-    targetProductId = firstProduct.id;
+
+    if (existingConv) {
+      targetProductId = existingConv.productId;
+      console.log(`[handleIncomingMessage] No productId given — reusing existing conversation product_${targetProductId} for ${fbUserId}`);
+    } else {
+      // Fall back to the first active product
+      const [firstProduct] = await db
+        .select()
+        .from(productsTable)
+        .where(eq(productsTable.isActive, true))
+        .limit(1);
+      if (!firstProduct) return null;
+      targetProductId = firstProduct.id;
+    }
   }
 
   const conditions = [
