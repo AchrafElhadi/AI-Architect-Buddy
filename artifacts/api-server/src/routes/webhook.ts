@@ -8,7 +8,7 @@ import {
 } from "@workspace/db";
 import { SimulateMessageBody } from "@workspace/api-zod";
 import { generateAiReply, generateCommentAck } from "../lib/ai";
-import { replyToComment, sendMessengerMessage } from "../lib/facebook";
+import { replyToComment, sendMessengerMessage, parseProductRef } from "../lib/facebook";
 
 const router: IRouter = Router();
 
@@ -47,18 +47,51 @@ router.post("/webhook/facebook", async (req, res): Promise<void> => {
 
   if (body.object === "page") {
     for (const entry of body.entry ?? []) {
-      // ── Messenger messages ──────────────────────────────────────────────────
+      // ── Messenger messages + referrals (m.me links) ─────────────────────────
       for (const messagingEvent of entry.messaging ?? []) {
+        const fbUserId = messagingEvent.sender?.id as string;
+        if (!fbUserId) continue;
+
+        // Extract product ID from m.me ref if present (e.g. ?ref=product_5)
+        const ref = messagingEvent.referral?.ref as string | undefined;
+        const refProductId = ref ? parseProductRef(ref) : null;
+        if (refProductId) {
+          console.log(`[Webhook] m.me referral from ${fbUserId} → product_id=${refProductId}`);
+        }
+
+        // ── Case 1: Referral-only event (user opened chat via m.me, no message yet)
+        if (!messagingEvent.message && messagingEvent.referral) {
+          try {
+            const product = refProductId
+              ? (await db.select().from(productsTable).where(eq(productsTable.id, refProductId)).limit(1))[0]
+              : (await db.select().from(productsTable).where(eq(productsTable.isActive, true)).limit(1))[0];
+
+            if (product) {
+              const price = Number(product.price).toFixed(2);
+              const welcome =
+                `Hi! 👋 Thanks for reaching out about "${product.name}".\n` +
+                `Price: ${price} MAD${product.colors ? ` | Colors: ${product.colors}` : ""}${product.stock ? ` | ${product.stock} in stock` : ""}.\n\n` +
+                `Feel free to ask me anything — I'm here to help! 😊`;
+              await sendMessengerMessage(fbUserId, welcome);
+              console.log(`[Webhook] Sent welcome for product_${product.id} to ${fbUserId}`);
+            }
+          } catch (err) {
+            console.error(`[Webhook] ERROR handling referral-only event for ${fbUserId}:`, err);
+          }
+          continue;
+        }
+
+        // ── Case 2: Regular message (with or without referral)
         if (messagingEvent.message && !messagingEvent.message.is_echo) {
-          const fbUserId = messagingEvent.sender?.id as string;
           const messageText = messagingEvent.message?.text as string;
           const fbMessageId = messagingEvent.message?.mid as string;
-          if (fbUserId && messageText) {
+          if (messageText) {
             try {
               const result = await handleIncomingMessage({
                 fbUserId,
                 messageText,
                 fbMessageId,
+                productId: refProductId ?? undefined,
                 source: "facebook",
               });
               if (result?.aiReply?.content) {

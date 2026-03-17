@@ -6,6 +6,57 @@ function isConfigured(): boolean {
   return !!PAGE_ACCESS_TOKEN;
 }
 
+interface PageInfo {
+  id: string;
+  name: string;
+  username?: string;
+}
+
+let cachedPageInfo: PageInfo | null = null;
+
+/**
+ * Fetch the Facebook Page's id, name, and username from the Graph API.
+ * Result is cached in memory for the lifetime of the process.
+ */
+export async function getPageInfo(): Promise<PageInfo | null> {
+  if (cachedPageInfo) return cachedPageInfo;
+  if (!isConfigured()) return null;
+
+  try {
+    const url = `${FB_GRAPH_BASE}/me?fields=id,name,username&access_token=${PAGE_ACCESS_TOKEN}`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.error(`[Facebook] Failed to fetch page info: ${resp.status}`);
+      return null;
+    }
+    const data = await resp.json() as PageInfo;
+    cachedPageInfo = data;
+    return data;
+  } catch (err) {
+    console.error("[Facebook] Error fetching page info:", err);
+    return null;
+  }
+}
+
+/**
+ * Build the m.me link for a product.
+ * Format: https://m.me/{page_username_or_id}?ref=product_{productId}
+ */
+export async function buildMeLink(productId: number): Promise<string> {
+  const info = await getPageInfo();
+  const handle = info?.username ?? info?.id ?? "yourpage";
+  return `https://m.me/${handle}?ref=product_${productId}`;
+}
+
+/**
+ * Parse a m.me ref string and extract the product ID.
+ * Returns null if the ref is not a product ref.
+ */
+export function parseProductRef(ref: string): number | null {
+  const match = ref.match(/^product_(\d+)$/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
 /**
  * Reply publicly to a Facebook comment.
  * Typically used to say "I answered you in private, check your Messenger."

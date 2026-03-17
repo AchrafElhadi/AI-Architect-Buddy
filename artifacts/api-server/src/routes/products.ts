@@ -8,6 +8,10 @@ import {
   DeleteProductParams,
   GetProductParams,
 } from "@workspace/api-zod";
+import { getPageInfo, parseProductRef } from "../lib/facebook";
+
+// Re-export parseProductRef so it's available if needed elsewhere
+export { parseProductRef };
 
 const router: IRouter = Router();
 
@@ -105,6 +109,17 @@ router.delete("/products/:id", async (req, res): Promise<void> => {
   }
 
   res.sendStatus(204);
+});
+
+// ─── Page Info ────────────────────────────────────────────────────────────────
+
+router.get("/page-info", async (_req, res): Promise<void> => {
+  const info = await getPageInfo();
+  if (!info) {
+    res.json({ id: null, name: null, username: null });
+    return;
+  }
+  res.json(info);
 });
 
 export default router;

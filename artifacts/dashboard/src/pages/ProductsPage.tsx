@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Package, Tag, Layers, Link } from "lucide-react";
+import { Plus, Pencil, Trash2, Package, Tag, Layers, Link, Copy, Check, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +12,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   useListProducts,
   useCreateProduct,
@@ -22,6 +21,55 @@ import {
   getListProductsQueryKey,
 } from "@workspace/api-client-react";
 import type { Product } from "@workspace/api-client-react";
+
+const BASE_URL = import.meta.env.BASE_URL as string;
+
+interface PageInfo {
+  id: string | null;
+  name: string | null;
+  username?: string | null;
+}
+
+function usePageInfo() {
+  return useQuery<PageInfo>({
+    queryKey: ["page-info"],
+    queryFn: async () => {
+      const resp = await fetch(`${BASE_URL}api/page-info`);
+      if (!resp.ok) throw new Error("Failed to fetch page info");
+      return resp.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+function getMeLink(pageInfo: PageInfo | undefined, productId: number): string {
+  if (!pageInfo?.id) return `https://m.me/yourpage?ref=product_${productId}`;
+  const handle = pageInfo.username ?? pageInfo.id;
+  return `https://m.me/${handle}?ref=product_${productId}`;
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      onClick={copy}
+      className="p-1 rounded hover:bg-muted transition-colors"
+      title="Copy to clipboard"
+    >
+      {copied ? (
+        <Check size={12} className="text-green-500" />
+      ) : (
+        <Copy size={12} className="text-muted-foreground" />
+      )}
+    </button>
+  );
+}
 
 interface ProductForm {
   name: string;
@@ -167,13 +215,17 @@ function ProductDialog({
 
 function ProductCard({
   product,
+  pageInfo,
   onEdit,
   onDelete,
 }: {
   product: Product;
+  pageInfo: PageInfo | undefined;
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const meLink = getMeLink(pageInfo, product.id);
+
   return (
     <div className="bg-card border border-card-border rounded-lg p-4">
       <div className="flex items-start justify-between mb-3">
@@ -236,17 +288,39 @@ function ProductCard({
       {product.description && (
         <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{product.description}</p>
       )}
+
+      {/* m.me Messenger Link */}
+      <div className="mt-3 pt-3 border-t border-border">
+        <div className="flex items-center gap-1 mb-1">
+          <MessageCircle size={11} className="text-blue-500" />
+          <span className="text-xs font-medium text-foreground">Messenger Link</span>
+          <span className="text-xs text-muted-foreground">(paste in your post caption)</span>
+        </div>
+        <div className="flex items-center gap-1 bg-muted/60 rounded px-2 py-1.5">
+          <a
+            href={meLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:underline truncate flex-1 font-mono"
+            title={meLink}
+          >
+            {meLink}
+          </a>
+          <CopyButton text={meLink} />
+        </div>
+      </div>
     </div>
   );
 }
 
 export default function ProductsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editProduct, setEditProduct] = useState<ListProductsResponseItem | undefined>(undefined);
+  const [editProduct, setEditProduct] = useState<Product | undefined>(undefined);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: products = [], isLoading } = useListProducts();
+  const { data: pageInfo } = usePageInfo();
   const deleteProduct = useDeleteProduct();
 
   const handleDelete = async (id: number) => {
@@ -283,6 +357,17 @@ export default function ProductsPage() {
         </Button>
       </div>
 
+      {pageInfo?.name && (
+        <div className="mb-5 flex items-center gap-2 text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-2.5">
+          <MessageCircle size={14} className="text-blue-500 shrink-0" />
+          <span>
+            Connected page: <span className="font-semibold text-foreground">{pageInfo.name}</span>
+            {pageInfo.username && <span className="text-muted-foreground"> (@{pageInfo.username})</span>}
+            {" — "}Copy a Messenger link below and paste it in your Facebook post caption so customers know exactly which product they are asking about.
+          </span>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
@@ -307,6 +392,7 @@ export default function ProductsPage() {
             <ProductCard
               key={p.id}
               product={p}
+              pageInfo={pageInfo}
               onEdit={() => openEdit(p)}
               onDelete={() => handleDelete(p.id)}
             />
