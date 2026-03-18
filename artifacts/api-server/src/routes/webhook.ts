@@ -285,7 +285,7 @@ async function handleIncomingMessage({
     .filter((m) => m.role === "user" || m.role === "assistant")
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-  const { content, shouldEscalate } = await generateAiReply(
+  const { content, shouldEscalate, isConfirmed } = await generateAiReply(
     {
       name: product.name,
       price: product.price,
@@ -307,7 +307,16 @@ async function handleIncomingMessage({
     })
     .returning();
 
-  if (shouldEscalate) {
+  if (isConfirmed) {
+    await db
+      .update(conversationsTable)
+      .set({
+        status: "confirmed",
+        updatedAt: new Date(),
+      })
+      .where(eq(conversationsTable.id, conv.id));
+    console.log(`[Webhook] Conversation ${conv.id} marked as confirmed`);
+  } else if (shouldEscalate) {
     await db
       .update(conversationsTable)
       .set({

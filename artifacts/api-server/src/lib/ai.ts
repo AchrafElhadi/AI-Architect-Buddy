@@ -64,6 +64,13 @@ function buildSystemPrompt(product: ProductContext): string {
     `- Keep responses concise and to the point`,
     `- If you cannot answer a question confidently, say you will check and get back to them`,
     `- Never make up information not in the product details`,
+    ``,
+    `ORDER CONFIRMATION — very important:`,
+    `- When the customer has provided ALL of these in the conversation: chosen color (or N/A), quantity, phone number, AND delivery address — the order is complete.`,
+    `- In that case, reply with a warm order summary, e.g.: "Perfect! Here is your order summary: [product], [quantity] pcs, [color], delivery to [address], we will call [phone] to confirm. Thank you! 🎉"`,
+    `- Adapt the summary language to match the customer's language/dialect.`,
+    `- At the very end of your confirmation reply, append exactly this token on its own line: [CONFIRMED]`,
+    `- Only append [CONFIRMED] when the order is genuinely complete (all details collected). Do not append it in any other situation.`,
   );
 
   return parts.join("\n");
@@ -106,7 +113,7 @@ export async function generateCommentAck(userMessage: string): Promise<string> {
 export async function generateAiReply(
   product: ProductContext,
   conversationHistory: ChatMessage[],
-): Promise<{ content: string; shouldEscalate: boolean }> {
+): Promise<{ content: string; shouldEscalate: boolean; isConfirmed: boolean }> {
   const openai = getClient();
 
   const systemPrompt = buildSystemPrompt(product);
@@ -122,7 +129,7 @@ export async function generateAiReply(
   const response = await openai.chat.completions.create({
     model: "gpt-5-mini",
     messages,
-    max_completion_tokens: 500,
+    max_completion_tokens: 800,
   });
 
   const raw = response.choices[0]?.message?.content;
@@ -158,6 +165,13 @@ export async function generateAiReply(
     }
   }
 
+  // Detect and strip the [CONFIRMED] marker the AI adds when the order is complete
+  const isConfirmed = /\[CONFIRMED\]/i.test(content);
+  if (isConfirmed) {
+    content = content.replace(/\[CONFIRMED\]/gi, "").trim();
+    console.log("[AI] Order confirmed marker detected — conversation will be marked as confirmed");
+  }
+
   const escalationKeywords = [
     "negotiate", "discount", "reduce", "lower price", "less than", "pas cher", "moins cher",
     "réduction", "remise", "نقص", "تخفيض", "أرخص", "سعر أقل"
@@ -165,5 +179,5 @@ export async function generateAiReply(
   const lowerContent = content.toLowerCase();
   const shouldEscalate = escalationKeywords.some((k) => lowerContent.includes(k));
 
-  return { content, shouldEscalate };
+  return { content, shouldEscalate, isConfirmed };
 }
